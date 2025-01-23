@@ -124,6 +124,49 @@ app.get("/reviews", async (req, res) => {
     }
 });
 
+app.post("/favorites", async (req, res) => {
+    const { username, movieId } = req.body;
+    if (!username || !movieId) {
+        return res.status(400).json({ error: "Username and movie ID are required" });
+    }
+    try {
+        const userResult = await client.query("SELECT UserID FROM MovieUser WHERE Username = $1", [username]);
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        const userId = userResult.rows[0].userid;
+
+        const result = await client.query(
+            "INSERT INTO Favorite (UserID, MovieID) VALUES ($1, $2) RETURNING *",
+            [userId, movieId]
+        );
+        res.status(201).json({ message: "Favorite added successfully", favorite: result.rows[0] });
+    } catch (err) {
+        if (err.constraint === "favorite_userid_movieid_key") {
+            return res.status(400).json({ error: "This favorite already exists" });
+        }
+        res.status(500).json({ error: "Database error", details: err });
+    }
+});
+
+app.get("/favorites/:username", async (req, res) => {
+    const username = req.params.username;
+    try {
+        const result = await client.query(
+            `SELECT m.MovieID, m.Name, m.Year, g.Name AS Genre
+             FROM Favorite f
+             JOIN Movie m ON f.MovieID = m.MovieID
+             JOIN Genre g ON m.GenreID = g.GenreID
+             WHERE f.UserID = (SELECT UserID FROM MovieUser WHERE Username = $1)`,
+            [username]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: "Error retrieving favorites", details: err });
+    }
+});
+
+
 app.listen(3001, () => {
     console.log("Server running on http://localhost:3001");
 });
