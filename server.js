@@ -85,6 +85,47 @@ app.get("/movies/search", async (req, res) => {
     }
 });
 
+app.post("/favorites", async (req, res) => {
+    const { user_id, movie_id } = req.body;
+    try {
+        const result = await client.query(
+            `INSERT INTO Favorite (UserID, MovieID) VALUES ($1, $2) RETURNING *`,
+            [user_id, movie_id]
+        );
+        res.status(201).send(result.rows[0]);
+    } catch (err) {
+        res.status(500).send({ message: "Error adding favorite", error: err });
+    }
+});
+
+app.get("/favorites/:userId", async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const result = await client.query(
+            `SELECT m.* FROM Movie m
+            INNER JOIN Favorite f ON m.MovieID = f.MovieID
+            WHERE f.UserID = $1`,
+            [userId]
+        );
+        res.send(result.rows);
+    } catch (err) {
+        res.status(500).send({ message: "Error retrieving favorites", error: err });
+    }
+});
+
+app.delete("/favorites", async (req, res) => {
+    const { user_id, movie_id } = req.body;
+    try {
+        await client.query(
+            `DELETE FROM Favorite WHERE UserID = $1 AND MovieID = $2`,
+            [user_id, movie_id]
+        );
+        res.status(200).send({ message: "Favorite removed successfully" });
+    } catch (err) {
+        res.status(500).send({ message: "Error removing favorite", error: err });
+    }
+});
+
 app.listen(3001, () => {
     console.log("Server running on http://localhost:3001");
 });
